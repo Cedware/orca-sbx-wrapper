@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+is_model_catalog_probe() {
+  local -a args=("$@")
+  local -a suffix=(
+    -c 'project_root_markers=[]'
+    -c 'approval_policy=never'
+    -c 'features.plugins=false'
+    -s read-only -a never app-server
+  )
+  local offset=$((${#args[@]} - ${#suffix[@]}))
+  local i
+  ((offset >= 0)) || return 1
+  for ((i = 0; i < ${#suffix[@]}; i++)); do
+    [[ "${args[$((offset + i))]}" == "${suffix[$i]}" ]] || return 1
+  done
+  return 0
+}
+
+# Orca's catalog probe has a distinct suffix; ordinary app-servers stay in SBX.
+if is_model_catalog_probe "$@"; then
+  exec "${CODEX_SBX_HOST_CODEX:-codex}" "$@"
+fi
+
+sbx_args=(env exec)
+if [[ ! -t 0 || ! -t 1 ]]; then
+  sbx_args+=(-i)
+fi
+
+exec sbx "${sbx_args[@]}" -- codex "$@"
